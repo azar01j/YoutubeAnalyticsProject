@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: yt
+    database: airbnb
+    schema: ytanalytics
+    tables:
+      - name: '"Jungle_Toons_Kids_TV_RAW"'
+      - name: '"MrBeast_RAW"'
+      - name: '"PewDiePie_RAW"'
+      - name: '"T-Series_RAW"'
+      - name: yt_analytics_raw
+
