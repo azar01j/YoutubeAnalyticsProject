@@ -34,7 +34,9 @@ from cosmos.profiles import SnowflakeUserPasswordProfileMapping
 
 scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
 
-youtubers_list=["UCX6OQ3DkcsbYNE6H8uQQuVA","UC-lHJZR3Gqxm24_Vd_AJ5Yw","UC1gSyUP5QOZBebhlCObZ-0A","UCq-Fj5jknLsUf-MWSy4_brA"]
+youtubers_list=["UC-lHJZR3Gqxm24_Vd_AJ5Yw","UC1gSyUP5QOZBebhlCObZ-0A",
+                "UCq-Fj5jknLsUf-MWSy4_brA","UCJcCB-QYPIBcbKcBQOTwhiA",
+                "UCbCmjCuTUZos6Inko4u57UQ","UCX6OQ3DkcsbYNE6H8uQQuVA","UCY6KjrDBN_tIRFT_QNqQbRQ"]
 
 
 aws_credentials = BaseHook.get_connection('aws_yt')
@@ -161,7 +163,8 @@ def load_(session):
         csv_string = body.read().decode('utf-8')
         df = pd.read_csv(StringIO(csv_string))
         df_=df.head()
-        write_pandas(ctx,df,tabl_name,auto_create_table=True)
+        df_.drop('topicIds_3', axis=1)
+        write_pandas(ctx,df_,tabl_name,auto_create_table=True)
 
     
 
