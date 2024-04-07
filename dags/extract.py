@@ -117,7 +117,9 @@ def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
     new_df['timestamp']=ottawa_time
     s3 = session.client('s3')
     new_df = new_df.loc[:, ~new_df.columns.duplicated()]
-    key_=new_df["title"][0]+"/{}_data.csv".format(new_df["title"][0])
+    fl_name='_'.join(((((new_df["title"][0]).replace('-',' ')).split('/'))[0].split(' ')))
+    key_=fl_name+"/{}_data.csv".format(fl_name)
+
     try:
         response = s3.get_object(Bucket=bucket_name, Key=key_)
         existing_data = pd.read_csv(StringIO(response['Body'].read().decode('utf-8')))
@@ -130,6 +132,7 @@ def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
     except:
         new_df = new_df.loc[:, ~new_df.columns.duplicated()]
         csv_buffer = StringIO()
+        new_df=new_df.drop('description', axis=1)
         new_df.to_csv(csv_buffer, index=False)
         s3.put_object(Bucket=bucket_name,Key=key_,Body=csv_buffer.getvalue())
 
@@ -159,12 +162,23 @@ def load_(session):
         csv_obj = s3.get_object(Bucket="ytanalytics", Key=object_key)
         body = csv_obj['Body']
         tbl= '_'.join(((object_key.split('/'))[0].split(' ')))
+        tabl_name_spl="\""+tbl+"_RAW"+"\""
         tabl_name=tbl+"_RAW"
         csv_string = body.read().decode('utf-8')
         df = pd.read_csv(StringIO(csv_string))
         df_=df.head()
-        df_.drop('topicIds_3', axis=1)
-        write_pandas(ctx,df_,tabl_name,auto_create_table=True)
+        df.columns = [col.capitalize() for col in df.columns]
+        #print(df_["title"])
+        #print(df)
+        print(df.columns)
+        #write_pandas(ctx,df,tabl_name,auto_create_table=True)
+        #print(tabl_name)    
+        try:
+            cs.execute("truncate table ""{}""".format(tabl_name_spl))
+            write_pandas(ctx,df,tabl_name)
+        except:
+            write_pandas(ctx,df,tabl_name,auto_create_table=True)
+
 
     
 
