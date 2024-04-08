@@ -31,7 +31,7 @@ from cosmos.profiles import SnowflakeUserPasswordProfileMapping
 
     # Your code goes here.
 
-
+#Defining the credentials and apis which are needed to extract
 scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
 
 youtubers_list=["UC-lHJZR3Gqxm24_Vd_AJ5Yw","UC1gSyUP5QOZBebhlCObZ-0A",
@@ -39,10 +39,13 @@ youtubers_list=["UC-lHJZR3Gqxm24_Vd_AJ5Yw","UC1gSyUP5QOZBebhlCObZ-0A",
                 "UCbCmjCuTUZos6Inko4u57UQ","UCX6OQ3DkcsbYNE6H8uQQuVA","UCY6KjrDBN_tIRFT_QNqQbRQ"]
 
 
+#using aws base hook and to access the credentials defined in the airflow UI  
 aws_credentials = BaseHook.get_connection('aws_yt')
 session = boto3.Session(
 aws_access_key_id=aws_credentials.login,
 aws_secret_access_key=aws_credentials.password)
+
+#Aws Secret manager to store the snowflake creds and Google API key
 secret_name = "snowflake_data"
 region_name = "us-east-2"
 client = session.client(service_name='secretsmanager',region_name=region_name)
@@ -61,9 +64,9 @@ ctx= snowflake.connector.connect(
 
 cs=ctx.cursor()
 
-
-
-
+"""The main function accepts two arguments one is the channel ID and the other is the API key
+and it returns the json response for the respective youtube channel
+"""
 def main(chnls,secret):
     # Disable OAuthlib's HTTPS verification when running locally.
     # *DO NOT* leave this option enabled in production.
@@ -85,6 +88,12 @@ def main(chnls,secret):
     return response
 
 
+"""
+This function, named loopdict, takes a dictionary (val) along with two lists (lst_vals2 and lst_keys2) as input parameters. 
+Its purpose is to recursively iterate through the keys and values of the dictionary 
+and extract the keys and corresponding values into the provided lists.
+"""
+
 def loopdict(val:dict,lst_vals2,lst_keys2):
     #print(val)
     if type(val)==dict:
@@ -100,8 +109,14 @@ def loopdict(val:dict,lst_vals2,lst_keys2):
                 lst_keys2.append(key)
                 lst_vals2.append(value)
     #print(lst_keys2,lst_vals2)
-    return lst_keys2,lst_vals2     
+    return lst_keys2,lst_vals2
 
+"""
+This function, named extract, processes a response (resp) from an API, extracting relevant data into lists and a DataFrame. 
+It iterates through the response, identifying specific keys and values, and utilizes another function (loopdict) to handle nested dictionary structures. 
+The extracted data is then organized into a DataFrame, combined with existing data from an S3 bucket if available, and stored back into the bucket after processing. 
+Additionally, it appends a timestamp to the DataFrame to track when the extraction occurred.
+"""
 def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
     for key,value in resp.items():
         if key=="items":
@@ -112,7 +127,6 @@ def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
                     else:
                         col,val=loopdict(value1,lst_vals2,lst_keys2)
     new_df= pd.DataFrame([val],columns=col)
-    ottawa_timezone = pytz.timezone('America/Toronto')
     ottawa_time = datetime.now(ottawa_timezone) 
     new_df['timestamp']=ottawa_time
     s3 = session.client('s3')
@@ -139,6 +153,11 @@ def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
     return None
 
 
+"""
+The extract_data_google function fetches data from Google APIs for a list of YouTube channels, 
+processes the response, and stores the extracted data in an AWS S3 bucket named 'ytanalytics'.
+
+"""
 def extract_data_google(session):
     secret_name = "googleAPI"
     region_name = "us-east-2"
@@ -153,7 +172,11 @@ def extract_data_google(session):
         resp=main(chnls,secret)
         val=extract(bucket_name= 'ytanalytics',resp=resp,lst_values=lst_values,lst_vals2=lst_vals2,lst_keys2=lst_keys2,session=session)
 
+"""
+The load_ function fetches CSV data stored in an S3 bucket named 'ytanalytics', 
+loads it into a Snowflake database table, dynamically creating or truncating the table based on the CSV file's contents.
 
+"""
 
 def load_(session):
     s3 = session.client('s3')
