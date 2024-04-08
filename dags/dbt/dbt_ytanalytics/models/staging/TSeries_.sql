@@ -1,2 +1,2 @@
 select * from 
-{{ source('yt','"T-Series_RAW"')}}
+{{ source('yt','"T_Series_RAW"')}}

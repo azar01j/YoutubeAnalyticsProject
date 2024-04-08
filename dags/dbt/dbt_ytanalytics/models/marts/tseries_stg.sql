@@ -10,7 +10,7 @@ select
 "videoCount"::int as videoCount,
 "madeForKids"::Boolean as madeForKids,
 "timestamp"::datetime as timestamp
-from {{ ref('TSeries_') }}
+from {{ ref('T_Series_RAW') }}
 )
 
 select * from tseries_
