@@ -166,11 +166,9 @@ def load_(session):
         tabl_name=tbl+"_RAW"
         csv_string = body.read().decode('utf-8')
         df = pd.read_csv(StringIO(csv_string))
-        df_=df.head()
-        df.columns = [col.capitalize() for col in df.columns]
         #print(df_["title"])
         #print(df)
-        print(df.columns)
+        #print(df.columns)
         #write_pandas(ctx,df,tabl_name,auto_create_table=True)
         #print(tabl_name)    
         try:
