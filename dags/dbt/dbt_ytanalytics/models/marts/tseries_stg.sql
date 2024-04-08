@@ -9,8 +9,9 @@ select
 "subscriberCount"::int as subscriberCount,
 "videoCount"::int as videoCount,
 "madeForKids"::Boolean as madeForKids,
-"timestamp"::datetime as timestamp
-from {{ ref('T_Series_RAW') }}
+"timestamp"::datetime as timestamp,
+
+from {{ ref('TSeries_') }}
 )
 
 select * from tseries_

@@ -1,4 +1,4 @@
-with Jungle_ as (
+with Madan_gowri_stg as (
 select 
 "title"::varchar(50) as title,
 "customUrl"::varchar(50) as customUrl,
@@ -9,8 +9,9 @@ select
 "subscriberCount"::int as subscriberCount,
 "videoCount"::int as videoCount,
 "madeForKids"::Boolean as madeForKids,
-"timestamp"::datetime as timestamp
-from {{ ref('Jungle_Toons_') }}
+"timestamp"::datetime as timestamp,
+
+from {{ ref('Madan_Gowri_') }}
 )
 
-select * from Jungle_
+select * from Madan_gowri_stg
