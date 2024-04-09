@@ -91,13 +91,10 @@ and extract the keys and corresponding values into the provided lists.
 
 def loopdict(json_data:dict):
     df = pd.json_normalize(json_data["items"])
-
     columns_=[]
-
     for cols in df.columns:
         act_cols=cols.split('.')
         columns_.append(act_cols[len(act_cols)-1])
-    
     df.columns=columns_
     return df,columns_
 
@@ -112,25 +109,22 @@ def extract(bucket_name:str,resp,session):
     ottawa_timezone=pytz.timezone('America/Toronto')
     ottawa_time = datetime.now(ottawa_timezone) 
     new_df['timestamp']=ottawa_time
-    s3 = session.client('s3')
     new_df = new_df.loc[:, ~new_df.columns.duplicated()]
+    new_df=new_df.drop(['kind','description','etag','id','topicIds','topicCategories'], axis=1)
+    s3 = session.client('s3')
     fl_name='_'.join(((((new_df["title"][0]).replace('-',' ')).split('/'))[0].split(' ')))
     key_=fl_name+"/{}_data.csv".format(fl_name)
 
     try:
         response = s3.get_object(Bucket=bucket_name, Key=key_)
         existing_data = pd.read_csv(StringIO(response['Body'].read().decode('utf-8')))
-        existing_data.columns=column_new
         append_df=pd.concat([new_df,existing_data],ignore_index=True)
-        append_df=append_df.drop('description', axis=1)
         csv_buffer = StringIO()
         append_df.to_csv(csv_buffer, index=False)
         s3.put_object(Bucket=bucket_name,Key=key_,Body=csv_buffer.getvalue())
 
     except:
-        new_df = new_df.loc[:, ~new_df.columns.duplicated()]
         csv_buffer = StringIO()
-        new_df=new_df.drop('description', axis=1)
         new_df.to_csv(csv_buffer, index=False)
         s3.put_object(Bucket=bucket_name,Key=key_,Body=csv_buffer.getvalue())
 
