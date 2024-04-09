@@ -10,7 +10,6 @@ from botocore.exceptions import ClientError
 from io import StringIO
 import pytz
 import json
-#from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from snowflake.connector.pandas_tools import write_pandas
 import snowflake
 from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
@@ -68,14 +67,10 @@ cs=ctx.cursor()
 and it returns the json response for the respective youtube channel
 """
 def main(chnls,secret):
-    # Disable OAuthlib's HTTPS verification when running locally.
-    # *DO NOT* leave this option enabled in production.
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     apikey=secret
     api_service_name = "youtube"
     api_version = "v3"
-
-    # Get credentials and create a
     youtube = build(
         api_service_name, api_version, developerKey=apikey,cache_discovery=False)
 
@@ -94,22 +89,17 @@ Its purpose is to recursively iterate through the keys and values of the diction
 and extract the keys and corresponding values into the provided lists.
 """
 
-def loopdict(val:dict,lst_vals2,lst_keys2):
-    #print(val)
-    if type(val)==dict:
-        for key,value in val.items():            
-            if type(value)==dict:
-                loopdict(value,lst_vals2,lst_keys2)
-            elif type(value)==list:
-                for i in value:
-                    lst_vals2.append(i)
-                for i in range(len(value)):
-                    lst_keys2.append("{}_{}".format(key,i))
-            else:
-                lst_keys2.append(key)
-                lst_vals2.append(value)
-    #print(lst_keys2,lst_vals2)
-    return lst_keys2,lst_vals2
+def loopdict(json_data:dict):
+    df = pd.json_normalize(json_data["items"])
+
+    columns_=[]
+
+    for cols in df.columns:
+        act_cols=cols.split('.')
+        columns_.append(act_cols[len(act_cols)-1])
+    
+    df.columns=columns_
+    return df,columns_
 
 """
 This function, named extract, processes a response (resp) from an API, extracting relevant data into lists and a DataFrame. 
@@ -117,16 +107,9 @@ It iterates through the response, identifying specific keys and values, and util
 The extracted data is then organized into a DataFrame, combined with existing data from an S3 bucket if available, and stored back into the bucket after processing. 
 Additionally, it appends a timestamp to the DataFrame to track when the extraction occurred.
 """
-def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
-    for key,value in resp.items():
-        if key=="items":
-            for values in value:
-                for key1,value1 in values.items():
-                    if type(value1) == str:
-                        lst_values.append(value1)
-                    else:
-                        col,val=loopdict(value1,lst_vals2,lst_keys2)
-    new_df= pd.DataFrame([val],columns=col)
+def extract(bucket_name:str,resp,session):
+    new_df,column_new= loopdict(resp)
+    ottawa_timezone=pytz.timezone('America/Toronto')
     ottawa_time = datetime.now(ottawa_timezone) 
     new_df['timestamp']=ottawa_time
     s3 = session.client('s3')
@@ -137,6 +120,7 @@ def extract(bucket_name:str,resp,lst_values,lst_vals2,lst_keys2,session):
     try:
         response = s3.get_object(Bucket=bucket_name, Key=key_)
         existing_data = pd.read_csv(StringIO(response['Body'].read().decode('utf-8')))
+        existing_data.columns=column_new
         append_df=pd.concat([new_df,existing_data],ignore_index=True)
         append_df=append_df.drop('description', axis=1)
         csv_buffer = StringIO()
@@ -166,11 +150,8 @@ def extract_data_google(session):
     secret_ = get_secret_value_response['SecretString']
     secret=json.loads(secret_)["api_key"]
     for chnls in youtubers_list:
-        lst_vals2=[]
-        lst_keys2=[]
-        lst_values=[]
         resp=main(chnls,secret)
-        val=extract(bucket_name= 'ytanalytics',resp=resp,lst_values=lst_values,lst_vals2=lst_vals2,lst_keys2=lst_keys2,session=session)
+        val=extract(bucket_name= 'ytanalytics',resp=resp,session=session)
 
 """
 The load_ function fetches CSV data stored in an S3 bucket named 'ytanalytics', 
@@ -189,11 +170,6 @@ def load_(session):
         tabl_name=tbl+"_RAW"
         csv_string = body.read().decode('utf-8')
         df = pd.read_csv(StringIO(csv_string))
-        #print(df_["title"])
-        #print(df)
-        #print(df.columns)
-        #write_pandas(ctx,df,tabl_name,auto_create_table=True)
-        #print(tabl_name)    
         try:
             cs.execute("truncate table ""{}""".format(tabl_name_spl))
             write_pandas(ctx,df,tabl_name)
@@ -245,14 +221,3 @@ with DAG("extract_cloud",start_date=datetime(2023,12,26),
         execution_config=ExecutionConfig(dbt_executable_path=f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt",))
 
     downloading_rates >> rates_to_raw >> transform_data
-
-
-
-"""
-trigger_job_run1 = DbtCloudRunJobOperator(
-    task_id="trigger_job_run1",
-    job_id=70403103916703,
-    check_interval=10,
-    \\timeout=300,
-    )
-"""
