@@ -202,8 +202,8 @@ with DAG("extract_cloud",start_date=datetime(2023,12,26),
             op_kwargs={'session':session},
     )
 
-    rates_to_raw = PythonOperator(
-            task_id="rates_to_raw",
+    loading_data_db = PythonOperator(
+            task_id="loading_data_db",
             python_callable=load_,
             op_kwargs={'session':session},
     )
@@ -214,4 +214,4 @@ with DAG("extract_cloud",start_date=datetime(2023,12,26),
         profile_config=profile_config,
         execution_config=ExecutionConfig(dbt_executable_path=f"{os.environ['AIRFLOW_HOME']}/dbt_venv/bin/dbt",))
 
-    downloading_rates >> rates_to_raw >> transform_data
+    downloading_rates >> loading_data_db >> transform_data
